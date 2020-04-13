@@ -366,7 +366,8 @@ phina.define('ResultScene', {
       stroke: 'black',
     });
     this.tweet.setPosition(SCREEN_X * 2 / 3, SCREEN_Y * 3 / 4);
-    this.tweet.onpointend = function() {
+    // onclickじゃないとあかんのか？
+    this.tweet.onclick = function() {
       let txt = `${param.score}点のレイマリを手に入れた先で\n僕が見つけた真実は……\n\n`;
       let table = 'レイマリアメミルサナモン';
       param.mojis.children.each((e) => {
@@ -453,7 +454,8 @@ phina.define('TitleScene', {
       stroke: 'black',
     }).addChildTo(this);
     this.start.setPosition(SCREEN_X / 3, SCREEN_Y * 3 / 4);
-    this.start.onpointstart = function(){
+    // onclickじゃないとあかんのか？
+    this.start.onclick = function(){
       //モバイル端末での音声再生のためにcontextを出し入れする必要があるらしい
       let context = phina.asset.Sound.getAudioContext();
       context.resume();
