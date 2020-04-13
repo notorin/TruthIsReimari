@@ -25,7 +25,7 @@ const ASSETS = {
     'ok': './sounds/OK.wav',
     'ng': './sounds/NG.wav',
     'result': './sounds/Result.wav',
-    'music': './sounds/we_are_the_strongest.wav',
+    'music': './sounds/Bgm.mp3',
   },
 }
 
@@ -455,7 +455,7 @@ phina.define('TitleScene', {
     this.start.setPosition(SCREEN_X / 3, SCREEN_Y * 3 / 4);
     this.start.onpointstart = function(){
       //モバイル端末での音声再生のためにcontextを出し入れする必要があるらしい
-      var context = phina.asset.Sound.getAudioContext();
+      let context = phina.asset.Sound.getAudioContext();
       context.resume();
 
       self.start.remove();
