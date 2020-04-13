@@ -549,6 +549,7 @@ phina.main(function() {
     width: SCREEN_X,
     height: SCREEN_Y,
     assets: ASSETS,
+    fps: 30,
   });
   // アプリケーション実行
   app.run();
