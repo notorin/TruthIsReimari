@@ -454,6 +454,10 @@ phina.define('TitleScene', {
     }).addChildTo(this);
     this.start.setPosition(SCREEN_X / 3, SCREEN_Y * 3 / 4);
     this.start.onpointstart = function(){
+      //モバイル端末での音声再生のためにcontextを出し入れする必要があるらしい
+      let context = phina.asset.Sound.getAudioContext();
+      context.resume();
+
       self.start.remove();
       self.howto.remove();
 
