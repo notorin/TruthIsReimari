@@ -4,6 +4,8 @@ phina.globalize();
 // 画面サイズ
 const SCREEN_X = 800;
 const SCREEN_Y = 600;
+// 制限時間
+const TIMELIMIT = 70;
 // 使用素材
 const ASSETS = {
   // 画像
@@ -60,6 +62,14 @@ phina.define('DotCharacter', {
   },
 });
 
+phina.define('MyLabel', {
+  superClass: 'Label',
+  init: function(param){
+    this.superInit(param);
+    this.strokeWidth =  5;
+  }
+})
+
 // 文字画像クラス
 phina.define('Moji', {
   superClass: 'Sprite',
@@ -74,6 +84,8 @@ phina.define('Moji', {
       else
         // 間違った文字の時に選択すると正しい文字に
         this.frameIndex = this.correctIndex
+      this.y -= 40;
+      this.tweener.moveBy(0, 40, 100, 'easeOutElastic').play();
     };
   },
 
@@ -129,27 +141,50 @@ phina.define('HardQcreator', {
 
 // スコアクラス
 phina.define('Score', {
-  superClass: 'Label',
+  superClass: 'DisplayElement',
   init: function() {
-    this.superInit({
+    this.superInit();
+    this.s = 0;
+    this.score = MyLabel({
       text: 'SCORE:0',
       fontSize: 40,
+      fontWeight:'bold',
       fill: 'white',
       stroke: 'black',
-    });
-    this.score = 0;
-    this.origin.set(0, 0);
-    this.x = SCREEN_X / 32;
-    this.y = SCREEN_Y / 32;
+    }).addChildTo(this);
+    this.score.origin.set(0, 0);
+    this.score.setPosition(SCREEN_X / 32, SCREEN_Y / 32);
+
+    this.effect = MyLabel({
+      fontSize: 30,
+      stroke: 'white',
+      fontWeight:'bold',
+    }).addChildTo(this);
+    this.effect.setPosition(SCREEN_X / 2, SCREEN_Y / 3);
+    this.effect.alpha = 0;
   },
 
-  addScore: function(s) {
-    this.score += s;
-    this.text = `SCORE:${this.score}`;
-    this.y -= 40;
-    this.fill = 'yellow';
-    this.tweener.moveBy(0, 40, 500, 'easeOutElastic').set({fill:'white'}).play();
-  }
+  getScore: function() {return this.s},
+
+  addScore: function(ds) {
+    this.s += ds;
+    this.score.text = `SCORE:${this.s}`;
+    this.score.setPosition(SCREEN_X / 32, SCREEN_Y / 32 - 40);
+    this.score.fill = 'yellow';
+    this.score.tweener.moveBy(0, 40, 500, 'easeOutElastic').set({fill:'white'}).play();
+    this.setRate(ds);
+    this.effect.setPosition(SCREEN_X / 2, SCREEN_Y / 3);
+    this.effect.alpha = 1;
+    this.effect.tweener.moveBy(0, 40, 400, 'easeOutQuart').fadeOut(150).play();
+  },
+
+  setRate: function(ds) {
+    if(ds > TIMELIMIT * 3 / 4) {this.effect.text = 'Excellent!!!'; this.effect.fill = 'red'}
+    else if(ds > TIMELIMIT * 2 / 4) {this.effect.text = 'Great!!'; this.effect.fill = 'orange'}
+    else if(ds > TIMELIMIT * 1 / 4) {this.effect.text = 'Good!'; this.effect.fill = 'yellow'}
+    else {this.effect.text = 'OK'; this.effect.fill = 'green'}
+    this.effect.text += `\n+${ds}`;
+  },
 });
 
 // MainScene クラスを定義
@@ -158,6 +193,7 @@ phina.define('MainScene', {
   init: function() {
     this.superInit();
 
+    // 背景
     this.bg = Shape({
       x: SCREEN_X / 2,
       y: SCREEN_Y / 2,
@@ -166,7 +202,7 @@ phina.define('MainScene', {
       backgroundColor: 'skyblue'
     }).addChildTo(this);
     this.bg.tweener.to({width: SCREEN_X},3000).play();
-    // 文字
+    // レイマリの文字
     this.mojis = DisplayElement().addChildTo(this);
     this.mojis.setPosition(0, SCREEN_Y / 3);
     let m = this.mojis;
@@ -176,7 +212,6 @@ phina.define('MainScene', {
     this.mojis.isCorrect = function() {
       return this.children.find(e => e.frameIndex != e.correctIndex) == undefined
     };
-
     // れいむ
     this.reimu = DotCharacter('reimu', 'chara_ss', 32, 40).addChildTo(this);
     this.reimu.gotoAndPlay('stand');
@@ -187,15 +222,25 @@ phina.define('MainScene', {
     this.marisa.gotoAndPlay('stand');
     this.marisa.setPosition(SCREEN_X + this.marisa.width, SCREEN_Y * 3 / 4);
     this.marisa.tweener.to({x: SCREEN_X * 3 / 4},2000).play();
-
-    this.effect = Label({
+    // Ready Go!とLevel Up!を兼ねているラベル←なんで？
+    this.effect = MyLabel({
       text: 'Ready...',
       fontSize: 80,
+      fontWeight:'bold',
       fill: 'red',
       stroke: 'black',
     }).addChildTo(this);
     this.effect.setPosition(SCREEN_X / 2, SCREEN_Y / 2);
     this.effect.tweener.to({fontSize: 40, alpha:0},1500).play();
+    // 説明文
+    this.label = MyLabel({
+      text: '↑正しくない文字をタッチ！↑',
+      fontSize: 30,
+      fill: 'black',
+      stroke: 'white',
+    }).addChildTo(this);
+    this.label.setPosition(SCREEN_X / 2, SCREEN_Y / 2);
+    this.label.alpha = 0;
 
     // ゲーム状態
     this.state = -1;
@@ -224,30 +269,33 @@ phina.define('MainScene', {
         this.mojis.setPosition(0, SCREEN_Y / 3);
         this.questioncreator.createQuestion();
         this.mojis.children.each(e => e.setInteractive(true));
+        if(this.questioncreator.className === 'EasyQcreator') this.label.alpha = 1;
         this.counter = 0;
         this.state = 1;
         break;
       case 1:// choose!
-        this.bg.width = SCREEN_X * (75 - this.counter) / 75;
+        this.bg.width = SCREEN_X * (TIMELIMIT - this.counter) / TIMELIMIT;
         if(this.mojis.isCorrect()) {
           SoundManager.play('ok');
-          this.score.addScore(76 - this.counter);
+          this.score.addScore(TIMELIMIT - this.counter + 1);
           this.mojis.children.each(e => e.setInteractive(false));
           this.reimu.gotoAndPlay('jump');
           this.marisa.gotoAndPlay('jump');
           this.bg.tweener.to({width: SCREEN_X},300).play();
+          this.label.alpha = 0;
           this.counter = 0;
           this.state = 2;
           if(this.isChangeDifficulty()) this.ChangeDifficulty();
-        } else if(this.counter >= 75) {
+        } else if(this.counter >= TIMELIMIT) {
           SoundManager.play('ng');
           SoundManager.stopMusic('music');
           this.mojis.children.each(e => e.setInteractive(false));
-          this.counter = 0;
-          this.state = 3;
           this.reimu.gotoAndPlay('stare');
           this.marisa.gotoAndPlay('stare');
           this.bg.alpha = 0;
+          this.label.alpha = 0;
+          this.counter = 0;
+          this.state = 3;
         }
         break;
       case 2:// clear!
@@ -258,30 +306,31 @@ phina.define('MainScene', {
       case 3:// gameover
         if(this.counter >= 20) this.exit({
           mojis: this.mojis,
-          score: this.score.score,
+          score: this.score.getScore(),
         });
         break;
     }
   },
 
   isChangeDifficulty: function(){
-    return (this.score.score > 500 && this.questioncreator.className === 'EasyQcreator'
-        ||  this.score.score > 1000 && this.questioncreator.className === 'NormalQcreator')
+    return (this.score.getScore() > 500 && this.questioncreator.className === 'EasyQcreator'
+        ||  this.score.getScore() > 1000 && this.questioncreator.className === 'NormalQcreator')
   },
 
   ChangeDifficulty: function(){
-    if(this.score.score > 1000) this.questioncreator = HardQcreator(this.mojis);
+    if(this.score.getScore() > 1000) this.questioncreator = HardQcreator(this.mojis);
     else                       this.questioncreator = NormalQcreator(this.mojis);
 
-    this.effect = Label({
+    this.effect = MyLabel({
       text: 'Level Up!!',
       fontSize: 30,
+      fontWeight:'bold',
       fill: 'yellow',
       stroke: 'black',
     }).addChildTo(this);
     this.effect.x = SCREEN_X / 2;
-    this.effect.y = SCREEN_Y / 3;
-    this.effect.tweener.to({y:SCREEN_Y / 6, alpha:0},1500).play();
+    this.effect.y = SCREEN_Y / 2;
+    this.effect.tweener.to({fontSize: 50, alpha:0},1500).play();
   },
 });
 
@@ -293,7 +342,7 @@ phina.define('ResultScene', {
     this.mojis = param.mojis;
     this.mojis.setPosition(0, SCREEN_Y / 2);
 
-    this.label1 = Label({
+    this.label1 = MyLabel({
       text: `${param.score}点のレイマリを手に入れた先で`,
       fontSize: 40,
       fill: 'black',
@@ -301,7 +350,7 @@ phina.define('ResultScene', {
     }).addChildTo(this);
     this.label1.setPosition(SCREEN_X / 2, SCREEN_Y / 6);
 
-    this.label2 = Label({
+    this.label2 = MyLabel({
       text: '僕が見つけた真実は……',
       fontSize: 40,
       fill: 'black',
@@ -340,7 +389,7 @@ phina.define('ResultScene', {
     let self = this;
     this.back.setPosition(SCREEN_X / 3, SCREEN_Y * 3 / 4);
     this.back.onpointend = function() {
-      rscene.exit();
+      self.exit();
     };
   },
 
@@ -371,13 +420,20 @@ phina.define('TitleScene', {
   init: function() {
     this.superInit();
 
-    this.label1 = Label({
+    this.label1 = MyLabel({
       text: '僕の見つけた真実は',
       fontSize: 40,
       fill: 'black',
       stroke: 'skyblue',
     }).addChildTo(this);
     this.label1.setPosition(SCREEN_X / 2, SCREEN_Y / 4);
+    this.label2 = MyLabel({
+      text: '東方Project二次創作\nつくったひと:のとりん',
+      fontSize: 30,
+      fill: 'black',
+      stroke: 'skyblue',
+    }).addChildTo(this);
+    this.label2.setPosition(SCREEN_X / 2, SCREEN_Y * 8 / 9);
 
     this.mojis = DisplayElement().addChildTo(this);
     this.mojis.setPosition(0, SCREEN_Y / 2);
@@ -390,7 +446,7 @@ phina.define('TitleScene', {
                       .setLoop(true).play();
     
     this.start = Button({
-      text: 'start',
+      text: 'Start',
       fontSize: 40,
       fontColor: 'White',
       fill: 'blue',
@@ -401,14 +457,15 @@ phina.define('TitleScene', {
       self.start.remove();
       self.howto.remove();
 
-      self.label2 = Label({
+      self.label3 = MyLabel({
         text: 'GAME START!!',
         fontSize: 40,
+        fontWeight:'bold',
         fill: 'red',
         stroke: 'black',
       }).addChildTo(self);
-      self.label2.setPosition(SCREEN_X / 2, SCREEN_Y * 3 / 4);
-      self.label2.tweener.fadeOut(150).fadeIn(100).setLoop(true).play();
+      self.label3.setPosition(SCREEN_X / 2, SCREEN_Y * 3 / 4);
+      self.label3.tweener.fadeOut(150).fadeIn(100).setLoop(true).play();
 
       self.counter = 1;
       let m = self.mojis.children;
@@ -422,7 +479,7 @@ phina.define('TitleScene', {
     }
 
     this.howto = Button({
-      text: 'How to play',
+      text: 'How To Play',
       fontSize: 30,
       fontColor: 'White',
       fill: 'blue',
@@ -448,14 +505,14 @@ phina.define('HowToPlayScene', {
     this.superInit();
     this.backgroundColor = 'rgba(0, 0, 0, 0.7)';
 
-    this.text1 = Label({
+    this.text1 = MyLabel({
       text: 'あそびかた',
       fontSize: 50,
       fill: 'white',
       stroke: 'blue',
     }).addChildTo(this);
     this.text1.setPosition(SCREEN_X / 2, SCREEN_Y / 6); 
-    this.text2 = Label({
+    this.text2 = MyLabel({
       text: 'レイマリこそ正義！レイマリ以外は認めん！\n\n'+
             '次々と現れるレイマリっぽい文字列から、\n'+
             '正しくない要素を選び素早くタッチせよ！\n\n'+
@@ -465,7 +522,7 @@ phina.define('HowToPlayScene', {
       stroke: 'blue',
     }).addChildTo(this);
     this.text2.setPosition(SCREEN_X / 2, SCREEN_Y / 2); 
-    this.text3 = Label({
+    this.text3 = MyLabel({
       text: '画面タッチで戻る',
       fontSize: 25,
       fill: 'white',
